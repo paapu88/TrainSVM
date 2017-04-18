@@ -168,7 +168,13 @@ def evaluate_model(model, digits, samples, labels):
     return mosaic(25, vis)
 
 def preprocess_simple(digits):
-    return np.float32(digits).reshape(-1, SH*SW) / 255.0
+    samples = []
+    for img in digits:
+        samples.append(np.reshape(digits, (-1, SH*SW)).astype(np.float32)/255.0)
+    return samples
+
+#def preprocess_simple(digits):
+#    return np.float32(digits).reshape(-1, SH*SW) / 255.0
 
 def preprocess_hog(digits):
     samples = []
@@ -205,12 +211,16 @@ if __name__ == '__main__':
     shuffle = rand.permutation(len(digits))
     digits, labels = digits[shuffle], labels[shuffle]
 
-    digits2 = list(map(deskew, digits))
-    samples = preprocess_hog(digits2)
+    #digits2 = list(map(deskew, digits))
+    #samples = preprocess_hog(digits2)
+    #samples = preprocess_hog(digits)
+    samples = preprocess_simple(digits)
+
 
     train_n = int(0.9*len(samples))
     cv2.imshow('test set', mosaic(25, digits[train_n:]))
-    digits_train, digits_test = np.split(digits2, [train_n])
+    #digits_train, digits_test = np.split(digits2, [train_n])
+    digits_train, digits_test = np.split(digits, [train_n])
     samples_train, samples_test = np.split(samples, [train_n])
     labels_train, labels_test = np.split(labels, [train_n])
 
