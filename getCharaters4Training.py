@@ -22,16 +22,17 @@ class GetCharatersForTraining():
 
     """
 
-    def __init__(self, binary=False, negative_names=None):
+    def __init__(self, binary=False, negative_names=None,
+                 chars='ABCDEFGHJKLMNPRSTUVXYZ-0123456789'):
         self.font_height = 18
         self.output_height = 18
         self.output_width = 12
-        self.chars = 'ABCDEFGHJKLMNPRSTUVXYZ-0123456789'
+        self.chars = chars
         #for noise
         self.sigma=0.1
         self.angle=0
         self.salt_amount=0.1
-        self.repeat=300
+        self.repeat=500
         # sheet containing samples
 
         # if we only classify to positives and negatives, binary=true
@@ -168,22 +169,22 @@ class GetCharatersForTraining():
             scale = float(self.output_height) / height
             im = im.resize((self.output_width, self.output_height), Image.ANTIALIAS)
             not_moved = np.array(im)[:, :, 0].astype(np.float32) / 255.
-            #minx,maxx = self.getMinAndMaxX(not_moved)
-            #cmx=np.average([minx,maxx])
-            #miny,maxy = self.getMinAndMaxY(not_moved)
-            #cmy=np.average([miny,maxy])
+            minx,maxx = self.getMinAndMaxX(not_moved)
+            cmx=np.average([minx,maxx])
+            miny,maxy = self.getMinAndMaxY(not_moved)
+            cmy=np.average([miny,maxy])
 
-            #cm = ndimage.measurements.center_of_mass(not_moved)
-            #rows,cols = not_moved.shape
+            cm = ndimage.measurements.center_of_mass(not_moved)
+            rows,cols = not_moved.shape
             ##rows,cols = im.shape
-            #dy = rows/2 - cmy
-            #dx = cols/2 - cmx
-            #M = np.float32([[1,0,dx],[0,1,dy]])
-            #dst = cv2.warpAffine(not_moved,M,(cols,rows))
+            dy = rows/2 - cmy
+            dx = cols/2 - cmx
+            M = np.float32([[1,0,dx],[0,1,dy]])
+            dst = cv2.warpAffine(not_moved,M,(cols,rows))
             ##cv2.imshow('SVM test', dst)
             ##cv2.waitKey(0)
-            #yield c, dst
-            yield c, not_moved
+            yield c, dst
+            #yield c, not_moved
 
     def rotate(self, image):
         cols=image.shape[1]
@@ -329,8 +330,9 @@ if __name__ == '__main__':
     from matplotlib import pyplot as plt
 
     font_file = sys.argv[1]
+    chars = sys.argv[2]
     try:
-        negative_file_names = sys.argv[2]
+        negative_file_names = sys.argv[3]
         binary = True
     except:
         negative_file_names = None
@@ -339,7 +341,9 @@ if __name__ == '__main__':
 
     #app1 = GetCharatersForTraining(binary=False, negative_names=None)
     #app1.generate_positives_for_svm(font_file=font_file)
-    app1 = GetCharatersForTraining(binary=binary, negative_names=negative_file_names)
+    app1 = GetCharatersForTraining(binary=binary,
+                                   negative_names=negative_file_names,
+                                   chars=chars)
     app1.generate_positives_for_svm(font_file=font_file)
 
     #app1.generate_ideal(font_file=font_file)

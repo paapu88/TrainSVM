@@ -170,8 +170,8 @@ def evaluate_model(model, digits, samples, labels):
 def preprocess_simple(digits):
     samples = []
     for img in digits:
-        samples.append(np.reshape(digits, (-1, SH*SW)).astype(np.float32)/255.0)
-    return samples
+        samples.append(np.reshape(digits, (-1, SH*SW))/255.0)
+    return samples.astype(np.float32)
 
 #def preprocess_simple(digits):
 #    return np.float32(digits).reshape(-1, SH*SW) / 255.0
@@ -213,8 +213,8 @@ if __name__ == '__main__':
 
     #digits2 = list(map(deskew, digits))
     #samples = preprocess_hog(digits2)
-    #samples = preprocess_hog(digits)
-    samples = preprocess_simple(digits)
+    samples = preprocess_hog(digits)
+    #samples = preprocess_simple(digits)
 
 
     train_n = int(0.9*len(samples))
