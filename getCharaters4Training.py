@@ -51,15 +51,16 @@ class GetCharatersForTraining():
         minY = None
         maxY = None
         for iy in range(a.shape[0]):
-            for ix in range(a.shape[1]):
-                if a[iy,ix]> thr:
-                    minY = iy
-                    break
+            amax = np.max(a[iy,:])
+            #print("amax", iy, amax)
+            if amax > thr:
+                minY = iy
+                break
         for iy in reversed(range(a.shape[0])):
-            for ix in range(a.shape[1]):
-                if a[iy,ix]> thr:
-                    maxY = iy
-                    break
+            amax = np.max(a[iy,:])
+            if amax > thr:
+                maxY = iy
+                break
         return minY, maxY
 
     def getMinAndMaxX(self, a, thr=0.5):
@@ -67,15 +68,15 @@ class GetCharatersForTraining():
         minX = None
         maxX = None
         for ix in range(a.shape[1]):
-            for iy in range(a.shape[0]):
-                if a[iy,ix]> thr:
-                    minX = ix
-                    break
+            amax = np.max(a[:,ix])
+            if amax > thr:
+                minX = ix
+                break
         for ix in reversed(range(a.shape[1])):
-            for iy in range(a.shape[0]):
-                if a[iy,ix]> thr:
-                    maxX = ix
-                    break
+            amax = np.max(a[:,ix])
+            if amax > thr:
+                maxX = ix
+                break
         return minX, maxX
 
 
@@ -101,7 +102,8 @@ class GetCharatersForTraining():
             # var = 0.1
             # sigma = var**0.5
             #print ("M",mean, self.sigma)
-            gauss = np.random.normal(0.25, 0.25, (row, col))
+            #gauss = np.random.normal(0.25, 0.25, (row, col))
+            gauss = np.random.normal(0.1, 0.1, (row, col))
             gauss = gauss.reshape(row, col)
             noisy = image + gauss
             noisy = np.clip(noisy,0,1)
@@ -143,7 +145,7 @@ class GetCharatersForTraining():
             return noisy
         elif noise_typ == "blur":
             # in gaussia, size must be odd
-            distr = [1,1,1,1,1,1,1,1,3,3,3,3,5,5,7]
+            distr = [1,1,1,1,1,1,1,1,3,3,3,3]
             #distr = [1,1,3,3,3,3,5,5,7]
             sizex = random.choice(distr)
             sizey = random.choice(distr)
@@ -170,9 +172,14 @@ class GetCharatersForTraining():
             im = im.resize((self.output_width, self.output_height), Image.ANTIALIAS)
             not_moved = np.array(im)[:, :, 0].astype(np.float32) / 255.
             minx,maxx = self.getMinAndMaxX(not_moved)
+            #print(minx,maxx)
             cmx=np.average([minx,maxx])
             miny,maxy = self.getMinAndMaxY(not_moved)
+            #print(miny,maxy)
             cmy=np.average([miny,maxy])
+            #not_moved = not_moved[maxy:miny,maxx:minx]
+            #print(not_moved.shape)
+            #not_moved = cv2.resize(not_moved, (self.output_width, self.output_height))
 
             cm = ndimage.measurements.center_of_mass(not_moved)
             rows,cols = not_moved.shape
@@ -181,8 +188,8 @@ class GetCharatersForTraining():
             dx = cols/2 - cmx
             M = np.float32([[1,0,dx],[0,1,dy]])
             dst = cv2.warpAffine(not_moved,M,(cols,rows))
-            ##cv2.imshow('SVM test', dst)
-            ##cv2.waitKey(0)
+            #cv2.imshow('SVM test', dst)
+            #cv2.waitKey(0)
             yield c, dst
             #yield c, not_moved
 
@@ -202,7 +209,7 @@ class GetCharatersForTraining():
         clone = image.copy()
         myrandoms = np.random.random(5)
         #print("myrandoms ", myrandoms)
-        self.angle = random.gauss(0, 2)
+        self.angle = random.uniform(-10, 10)
 
         myones = np.ones(clone.shape)
 
