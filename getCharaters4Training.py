@@ -16,9 +16,34 @@ class GetCharatersForTraining():
     QÅÄÖ (not used in modern Finnish mainland plates)
     - is included for the moment
 
+    output: input file for SVM and a dictionary file to get ascii codes of labels
+
+    You can define your own character set by __init__(chars)
+
     Alternatively, if binary=True generate training set
     with half samples positive (images containing characters)
     and half negative (random images from big dataset)
+
+    Examples:
+~/PycharmProjects/TrainSVM/Letters				python3 ../getCharaters4Training.py "../../deep-anpr-orig/fonts/finPlate.ttf" "ABCDEFGHIJKLMNOPRSTUVXYZ"
+~/PycharmProjects/TrainSVM/Letters/SvmDir		python3 ../../character.py allSVM.tif allSVM.txt
+
+
+~/PycharmProjects/TrainSVM/Digits				python3 ../getCharaters4Training.py "../../deep-anpr-orig/fonts/finPlate.ttf" "0123456789"
+~/PycharmProjects/TrainSVM/Digits/SvmDir		python3 ../../character.py allSVM.tif allSVM.txt
+
+~/PycharmProjects/TrainSVM/Binary				python3 ../getCharaters4Training.py "../../deep-anpr-orig/fonts/finPlate.ttf" "ABCDEFGHIJKLMNOPRSTUVXYZ0123456789" "/home/mka/SUN397/u/utility_room/*"
+~/PycharmProjects/TrainSVM/Binary/SvmDir		python3 ../../character.py allSVM.tif allSVM.txt
+
+
+To see generated image sheet:
+python3 ../../Plate2Letters/showPictureMatplotlib.py SvmDir/allSVM.tif
+
+Test/Predict
+~/PycharmProjects/Image2Letters/Test>			python3 ../rekkariDetectionSave.py  vkz-825.jpg					                image to plate
+				                                python3 ../filterCharacterRegions.py 0-plateOnly-vkz-825.jpg					plate to character regions
+				                                python3 ../myClassifier.py 5-plateOnly-vkz-825.jpg.tif  /home/mka/PycharmProjects/TrainSVM/Binary/SvmDir/digits_svm.dat
+
 
     """
 
@@ -47,7 +72,7 @@ class GetCharatersForTraining():
 
 
     def getMinAndMaxY(self, a, thr=0.5):
-        """find the value in Y where image starts"""
+        """find the value in Y where image starts/ends"""
         minY = None
         maxY = None
         for iy in range(a.shape[0]):
@@ -64,7 +89,7 @@ class GetCharatersForTraining():
         return minY, maxY
 
     def getMinAndMaxX(self, a, thr=0.5):
-        """find the value in Y where image starts"""
+        """find the value in X where image starts/ends"""
         minX = None
         maxX = None
         for ix in range(a.shape[1]):
@@ -82,6 +107,7 @@ class GetCharatersForTraining():
 
     def noisy(self, noise_typ, image):
         """
+        Add noise to image
         Parameters
         ----------
         image : ndarray
@@ -89,11 +115,12 @@ class GetCharatersForTraining():
         mode : str
             One of the following strings, selecting the type of noise to add:
 
-            'gauss'     Gaussian-distributed additive noise.
+            'gaussAdd'     Gaussian-distributed additive noise.
             'poisson'   Poisson-distributed noise generated from the data.
             'sp'       Replaces random pixels with 0 or 1.
-            'speckle'   Multiplicative noise using out = image + n*image,where
+            'gaussMulti'   Multiplicative noise using out = image + n*image,where
                         n,is uniform noise with specified mean & variance.
+            'blur'      add gaussian blur
         """
 
         if noise_typ == "gaussAdd":
@@ -154,7 +181,7 @@ class GetCharatersForTraining():
             return noisy
 
     def make_char_ims_SVM(self, font_file):
-        """ get characters as numpy arrays"""
+        """ get characters as numpy arrays, center the characters in numpy array"""
 
         font_size = self.output_height * 4
 
@@ -172,18 +199,11 @@ class GetCharatersForTraining():
             im = im.resize((self.output_width, self.output_height), Image.ANTIALIAS)
             not_moved = np.array(im)[:, :, 0].astype(np.float32) / 255.
             minx,maxx = self.getMinAndMaxX(not_moved)
-            #print(minx,maxx)
             cmx=np.average([minx,maxx])
             miny,maxy = self.getMinAndMaxY(not_moved)
-            #print(miny,maxy)
             cmy=np.average([miny,maxy])
-            #not_moved = not_moved[maxy:miny,maxx:minx]
-            #print(not_moved.shape)
-            #not_moved = cv2.resize(not_moved, (self.output_width, self.output_height))
-
             cm = ndimage.measurements.center_of_mass(not_moved)
             rows,cols = not_moved.shape
-            ##rows,cols = im.shape
             dy = rows/2 - cmy
             dx = cols/2 - cmx
             M = np.float32([[1,0,dx],[0,1,dy]])
@@ -191,20 +211,18 @@ class GetCharatersForTraining():
             #cv2.imshow('SVM test', dst)
             #cv2.waitKey(0)
             yield c, dst
-            #yield c, not_moved
 
     def rotate(self, image):
         cols=image.shape[1]
         rows= image.shape[0]
         halfcols=cols/2
         average_color = 0.5*(np.average(image[0][:]) + np.average(image[rows-1][:]))
-        # print("COLOR",average_color)
         M = cv2.getRotationMatrix2D((cols/2,rows/2),self.angle,1)
         return cv2.warpAffine(image,M,(cols,rows),borderValue=average_color)
 
 
     def make_noise(self, image, invert=True):
-        """noisify image"""
+        """rotate and noisify image"""
 
         clone = image.copy()
         myrandoms = np.random.random(5)
@@ -235,6 +253,7 @@ class GetCharatersForTraining():
                 
     def generate_positives_for_svm(self,font_file=None,
                                    positive_dir='SvmDir',filename='allSVM'):
+        """write a big image containing positive samples, one row has one label"""
         import os, glob
         font_char_ims = dict(self.make_char_ims_SVM(font_file=font_file))
         random.seed()
@@ -276,7 +295,7 @@ class GetCharatersForTraining():
 
     def generate_negatives_for_svm(self, positive_dir=None,filename=None, y_init=None):
         """Write negative images to the same file as positive images
-        in the label file '0' means negative sample and '1' a positive sample
+           (negative ones are below positive ones)
         """
         # same number of negative images as with the positive ones
         import matplotlib.image as mpimg
@@ -284,33 +303,36 @@ class GetCharatersForTraining():
         def rgb2gray(rgb):
             return np.dot(rgb[...,:3], [0.299, 0.587, 0.114])
 
-
         random.seed()
         np.random.shuffle(self.negative_image_files)
         font_char_ims = dict(self.make_char_ims_SVM(font_file=font_file))
         for iy, (mychar, img) in enumerate(font_char_ims.items()):
             for condition in range(self.repeat):
-                ifile = random.randint(a=0,b=len(self.negative_image_files)-1)
-                #print("SN1:", ifile, len(self.negative_image_files))
-                #print("SN2", self.negative_image_files[ifile])
-                #big_negative = None
-                #while big_negative is None:
-                #    big_negative= cv2.imread(self.negative_image_files[ifile], 0)
-                big_negative = rgb2gray(mpimg.imread(self.negative_image_files[ifile]))
-                #print("BNN:", big_negative.shape)
-                x_ul=random.randint(a=0, b=(big_negative.shape[1]-1-img.shape[1]))
-                y_ul=random.randint(a=0, b=(big_negative.shape[0]-1-img.shape[0]))
+                found=False
+                while not found:
+                    ifile = random.randint(a=0,b=len(self.negative_image_files)-1)
+                    #big_negative = rgb2gray(mpimg.imread(self.negative_image_files[ifile]))
+                    big_negative = cv2.imread(self.negative_image_files[ifile])
+                    big_negative = cv2.cvtColor(big_negative,cv2.COLOR_BGR2GRAY)
+                    # get corners to have something else than flat areas
+                    corners = cv2.goodFeaturesToTrack(big_negative,5,0.01,10)
+                    corners = np.int0(corners)
+                    i=random.randint(0,len(corners)-1)
+                    x_ul, y_ul = corners[i].ravel()
+                    if ((x_ul + img.shape[1]) < big_negative.shape[1]) \
+                            and ((y_ul + img.shape[0]) < big_negative.shape[0]):
+                        found = True
+
+                # same noise as to positive samples
+                big_negative = self.make_noise(big_negative/255, invert=False)
+                #x_ul=random.randint(a=0, b=(big_negative.shape[1]-1-img.shape[1]))
+                #y_ul=random.randint(a=0, b=(big_negative.shape[0]-1-img.shape[0]))
                 small_negative = big_negative[y_ul:(y_ul+img.shape[0]), x_ul:(x_ul+img.shape[1])]
-                #add noise (same to all samples)
-                #print("SN: ", small_negative.shape, self.negative_image_files[ifile])
-                #clone = self.make_noise(small_negative/255, invert=False)
                 clone = small_negative.copy()
                 y1 = y_init + iy * img.shape[0]
                 y2 = y_init + (iy+1) * img.shape[0]
                 x1 = condition * img.shape[1]
                 x2 = (condition+1) * img.shape[1]
-                # print("clone shape", clone.shape,y1,y2)
-
                 self.bigsheet[y1:y2, x1:x2] = clone
                 with open(positive_dir+'/'+filename+'.txt', 'a') as f:
                     # false images are labeled as '0' in case of binary classification
@@ -345,27 +367,8 @@ if __name__ == '__main__':
         negative_file_names = None
         binary = False
 
-
-    #app1 = GetCharatersForTraining(binary=False, negative_names=None)
-    #app1.generate_positives_for_svm(font_file=font_file)
     app1 = GetCharatersForTraining(binary=binary,
                                    negative_names=negative_file_names,
                                    chars=chars)
     app1.generate_positives_for_svm(font_file=font_file)
 
-    #app1.generate_ideal(font_file=font_file)
-
-    #sys.exit()
-    #app1.generate_positives_for_haarcascade(font_file=font_file, repeat=40)
-    #app1.generate_positives_for_tesseract(font_file=font_file, repeat=400)
-
-    #SUN397forPlate
-
-    #font_char_ims = dict(app1.make_char_ims(font_file=font_file))
-    #for mychar, img in font_char_ims.items():
-    #    print ("mychar: ",mychar, img.shape )
-    #    img_noisy = app1.noisy("speckle", img)
-    #    img_rotated = app1.rotate(image=img_noisy, angle=-10)
-    #    plt.imshow(img_rotated)
-    #    plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-    #    plt.show()

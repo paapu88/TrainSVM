@@ -1,15 +1,14 @@
-#!/usr/bin/env python
 
 '''
 SVM and KNearest digit recognition.
 
-Sample loads a dataset of handwritten digits from '../data/digits.png'.
+Sample loads a dataset of characters as image and tehir labels as a txt file
 Then it trains a SVM and KNearest classifiers on it and evaluates
 their accuracy.
 
 Following preprocessing is applied to the dataset:
  - Moment-based image deskew (see deskew())
- - Digit images are split into 4 10x10 cells and 16-bin
+ - Digit images are split into cells and 16-bin
    histogram of oriented gradients is computed for each
    cell
  - Transform histograms to space with Hellinger metric (see [1] (RootSIFT))
@@ -20,7 +19,11 @@ Following preprocessing is applied to the dataset:
     http://www.robots.ox.ac.uk/~vgg/publications/2012/Arandjelovic12/arandjelovic12.pdf
 
 Usage:
-   character.py
+	python3 ./character.py allSVM.tif allSVM.txt
+
+    allSVM.tif  contains images of positive (and negative if binary) samples
+    allSVM.txt  contains labels
+
 '''
 
 
@@ -43,7 +46,7 @@ from common import clock, mosaic
 SH = 18 # height of a character
 SW = 12 # width of a character
 
-CLASS_N = 33  #number of characters (missing IOQÅÄÖ, digits one and zero are used instead of I and O in Fin plates)
+# CLASS_N = 33  #number of characters (missing IOQÅÄÖ, digits one and zero are used instead of I and O in Fin plates)
 
 
 def split2d(img, cell_size, flatten=True):
@@ -148,6 +151,7 @@ class SVM(StatModel):
 
 
 def evaluate_model(model, digits, samples, labels):
+    CLASS_N = len(labels)
     resp = model.predict(samples)
     err = (labels != resp).mean()
     print('error: %.2f %%' % (err*100))
